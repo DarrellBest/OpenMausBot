@@ -5,7 +5,7 @@
 # - Engines and the default model come from ~/.openmausbot/config.json.
 #
 # Usage: scripts/start-local.sh            # desktop app (Electron)
-#        scripts/start-local.sh server     # server only, http://127.0.0.1:8799
+#        scripts/start-local.sh server     # server + built web UI, http://127.0.0.1:8799
 set -eu
 PROFILE=${OMB_COLIMA_PROFILE:-openmausbot}
 cd "$(dirname "$0")/.."
@@ -19,6 +19,10 @@ fi
 export DOCKER_HOST="unix://$HOME/.colima/$PROFILE/docker.sock"
 
 case "${1:-desktop}" in
-  server) exec pnpm dev:server ;;
+  # Run node directly (not through pnpm) so a stop signal reaches the server itself.
+  # Serves the built web UI (pnpm exec vite build) at the server's own address when dist/ exists.
+  server)
+    [ -f dist/index.html ] && export OMB_STATIC_DIR="${OMB_STATIC_DIR:-$PWD/dist}"
+    exec node --experimental-strip-types server/dev-server.ts ;;
   *) exec pnpm dev:desktop ;;
 esac
