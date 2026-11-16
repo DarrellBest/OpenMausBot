@@ -1174,7 +1174,7 @@ export class Store {
     t.messages.push(full); this.threads.grew(threadId, full);
     t.activeLeafId = full.id;
     if (full.kind === "screen") {
-      for (const pruned of this.pruneScreenFrames(t)) {
+      for (const pruned of this.pruneScreenFrames(t, threadId)) {
         mdb.updateMessage(threadId, pruned);
         this.emit({ type: "message.patch", threadId, message: pruned });
       }
@@ -1194,7 +1194,7 @@ export class Store {
     t.messages.push(full); this.threads.grew(threadId, full);
     mdb.insertMessage(threadId, full);
     if (full.kind === "screen") {
-      for (const pruned of this.pruneScreenFrames(t)) {
+      for (const pruned of this.pruneScreenFrames(t, threadId)) {
         mdb.updateMessage(threadId, pruned);
         this.emit({ type: "message.patch", threadId, message: pruned });
       }
@@ -1215,7 +1215,7 @@ export class Store {
     return this.patchMessage(threadId, card.id, { card: { ...card.card, dismissed: true } });
   }
 
-  private pruneScreenFrames(t: { messages: Message[] }, keep = 4): Message[] {
+  private pruneScreenFrames(t: { messages: Message[] }, threadId: string, keep = 4): Message[] {
     const pruned: Message[] = [];
     let seen = 0;
     for (let i = t.messages.length - 1; i >= 0 && seen < t.messages.length; i--) {
@@ -1223,7 +1223,7 @@ export class Store {
       if (m.kind !== "screen" || !m.png) continue;
       seen += 1;
       if (seen > keep) {
-        m.png = undefined;
+        this.threads.grew(threadId, { ...m, png: undefined }, m); m.png = undefined;
         pruned.push(m);
       }
     }
