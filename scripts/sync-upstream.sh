@@ -67,7 +67,20 @@ sync_main() {
   fi
   pnpm exec vite build >/dev/null 2>&1 && refresh+=("web UI rebuilt") || refresh+=("**web UI build failed**")
   if launchctl print "$d/com.openmausbot.server" >/dev/null 2>&1; then
-    launchctl kickstart -k "$d/com.openmausbot.server" && refresh+=("server restarted")
+    # Never restart under a working bot: wait up to 2 hours for every bot to be idle.
+    bots_busy() {
+      curl -s -m 10 http://127.0.0.1:8799/api/bots | python3 -I -c 'import json,sys
+bots=json.load(sys.stdin).get("bots",[])
+sys.exit(0 if any(b.get("busy") or b.get("waitingForTeammates") for b in bots) else 1)' 2>/dev/null
+    }
+    local waited=0
+    while bots_busy && (( waited < 120 )); do sleep 60; (( waited++ )); done
+    if bots_busy; then
+      refresh+=("**server not restarted: bots were still working after 2 hours.** Turn MausBot off and on with the Desktop toggle to load the new code")
+    else
+      local note=""; (( waited > 0 )) && note=" (after waiting ${waited} min for bots to finish)"
+      launchctl kickstart -k "$d/com.openmausbot.server" && refresh+=("server restarted$note")
+    fi
   else
     refresh+=("server is off; it runs the new code next time it's turned on")
   fi
